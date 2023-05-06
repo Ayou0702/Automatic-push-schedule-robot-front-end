@@ -9,7 +9,7 @@ const showMobileSearch = ref(false);
 </script>
 
 <template>
-  <v-app-bar :density="mdAndUp ? 'default' : 'compact'">
+  <v-app-bar>
     <div class="d-flex flex-fill align-center" v-if="showMobileSearch">
       <v-text-field
         color="primary"

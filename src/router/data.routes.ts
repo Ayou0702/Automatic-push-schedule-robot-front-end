@@ -2,13 +2,23 @@
 
 export default [
   {
-    path: "/data/course-info-data",
-    component: () => import("@/views/data/CourseInfoDataPage.vue"),
+    path: "/data/course-data",
+    component: () => import("@/views/data/CourseDataPage.vue"),
     meta: {
       requiresAuth: true,
       layout: "ui",
       category: "Data",
-      title: "课表数据",
+      title: "课程数据",
+    },
+  },
+  {
+    path: "/data/teacher-data",
+    component: () => import("@/views/data/TeacherDataPage.vue"),
+    meta: {
+      requiresAuth: true,
+      layout: "ui",
+      category: "Data",
+      title: "教师数据",
     },
   },
   {

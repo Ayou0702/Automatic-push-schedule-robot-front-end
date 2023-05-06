@@ -18,17 +18,15 @@ const customizeTheme = useCustomizeThemeStore();
     <!-- ---------------------------------------------- -->
     <!---MainArea -->
     <!-- ---------------------------------------------- -->
-    <perfect-scrollbar>
       <v-main
-        class="main-area"
+        class="main-container"
         v-touch="{
-          left: () => (customizeTheme.mainSidebar = false),
-          right: () => (customizeTheme.mainSidebar = true),
-        }"
+      left: () => (customizeTheme.mainSidebar = false),
+      right: () => (customizeTheme.mainSidebar = true),
+    }"
       >
         <slot></slot>
       </v-main>
-    </perfect-scrollbar>
   </div>
 </template>
 
@@ -37,7 +35,9 @@ const customizeTheme = useCustomizeThemeStore();
   height: calc(100vh - 326px);
 }
 
-.main-area {
-  height: calc(100vh-64px);
+.main-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 </style>

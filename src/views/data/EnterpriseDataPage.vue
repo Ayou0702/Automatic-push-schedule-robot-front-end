@@ -189,7 +189,6 @@ function handleSelectionChange(val: CourseInfo[]) {
 </script>
 
 <template>
-  <div>
     <v-card>
       <v-card-title class="font-weight-bold">
         <span>{{ $t("menu.data.enterpriseData.enterpriseData") }}</span>
@@ -279,7 +278,6 @@ function handleSelectionChange(val: CourseInfo[]) {
         <v-spacer/>
       </div>
     </v-container>
-  </div>
 </template>
 
 <style scoped>

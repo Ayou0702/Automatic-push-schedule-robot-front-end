@@ -1,8 +1,3 @@
-<!--
-* @Component: 
-* @Maintainer: J.K. Yang
-* @Description: 
--->
 <script setup lang="ts">
 interface UserStatus {
   code: string;
