@@ -6,150 +6,166 @@ import {Icon} from "@iconify/vue";
 import {useCustomizeThemeStore} from "@/stores/customizeTheme";
 import {useTheme} from "vuetify";
 import axios from "axios";
-import {onMounted} from "vue";
+import {onBeforeMount, onMounted, ref, Ref} from "vue";
 import {ElMessage} from "element-plus";
 import i18n from "@/plugins/i18n";
-import {setThemeColor} from "@/utils/globalFunctions";
+import {elMessage, setThemeColor} from "@/utils/globalFunctions";
 
 const router = useRouter();
-
+const userId = "1";
+let userData = reactive({})
 const authStore = useAuthStore();
+const userAvatar = ref('')
 const handleLogout = (event: MouseEvent | KeyboardEvent) => {
-    authStore.logout();
-    console.log("---");
-    console.log(router);
+  authStore.logout();
+  console.log("---");
+  console.log(router);
 };
 let headImage = ref<string | null>(null);
 
 interface Color {
-    colorId: number;
-    colorName: string;
-    colorValue: string;
+  colorId: number;
+  colorName: string;
+  colorValue: string;
 }
 
 function setDarkTheme() {
-    customizeTheme.setDarkTheme()
-    if (customizeTheme.darkTheme) {
-        console.log("dark theme");
-        setThemeColor("#705cf6")
+  customizeTheme.setDarkTheme()
+  if (customizeTheme.darkTheme) {
+    console.log("dark theme");
+    setThemeColor("#705cf6")
 
-    } else {
-        setThemeColor(theme.themes.value.light.colors.primary)
-    }
+  } else {
+    setThemeColor(theme.themes.value.light.colors.primary)
+  }
 }
 
-const getHeadImage = async () => {
-    try {
-        const response = await axios.get(
-            "http://localhost:8089/image/prefersmin.jpg",
-            {responseType: "blob"}
-        );
-        const blob = new Blob([response.data], {type: "image/jpeg"});
-        headImage.value = URL.createObjectURL(blob);
-    } catch (error) {
-        console.log(error);
-    }
-};
+interface UserData {
+  userId: number,
+  userName: string,
+  userEmail: string,
+  userAvatar: Uint8Array
+}
 
-onMounted(getHeadImage);
+onBeforeMount(() => {
+
+  axios.post('http://localhost:8089/queryUserDataByUserId', {
+    "userId": userId
+  })
+       .then(response => {
+
+         response.data.data.userAvatar = 'data:image/jpeg;base64,' + response.data.data.userAvatar
+
+         userAvatar.value = response.data.data.userAvatar
+
+         userData = response.data.data
+
+         console.log(userData)
+
+       })
+       .catch(error => {
+         elMessage(error.message, "error")
+       });
+});
+
 const primaryColors = ref([
-    {
-        colorId: 1,
-        colorName: "grey",
-        colorValue: "#344767",
-    },
-    {
-        colorId: 2,
-        colorName: "info",
-        colorValue: "#17C1E8",
-    },
-    {
-        colorId: 3,
-        colorName: "success",
-        colorValue: "#82D616",
-    },
-    {
-        colorId: 4,
-        colorName: "warning",
-        colorValue: "#F2825A",
-    },
-    {
-        colorId: 5,
-        colorName: "error",
-        colorValue: "#EA0606",
-    },
+  {
+    colorId: 1,
+    colorName: "grey",
+    colorValue: "#344767",
+  },
+  {
+    colorId: 2,
+    colorName: "info",
+    colorValue: "#17C1E8",
+  },
+  {
+    colorId: 3,
+    colorName: "success",
+    colorValue: "#82D616",
+  },
+  {
+    colorId: 4,
+    colorName: "warning",
+    colorValue: "#F2825A",
+  },
+  {
+    colorId: 5,
+    colorName: "error",
+    colorValue: "#EA0606",
+  },
 ]);
 
 const navs = [
-    {
-        title: "Profile Details",
-        key: "menu.profileDetails",
-        link: "/profile",
-        icon: "mdi-account-box-outline",
-    },
-    {
-        title: "Plans and Billing",
-        key: "menu.plansAndBilling",
-        link: "/plans-and-billing",
-        icon: "mdi-credit-card-outline",
-    },
-    {
-        title: "Team",
-        key: "menu.team",
-        link: "/team",
-        icon: "mdi-account-group-outline",
-    },
-    {
-        title: "API Dashboard",
-        key: "menu.apiDashboard",
-        link: "/api-dashboard",
-        icon: "mdi-monitor-dashboard",
-    },
-    {
-        title: "Integrations",
-        key: "menu.integrations",
-        link: "/integrations",
-        icon: "mdi-puzzle-outline",
-    },
-    {
-        title: "Ask the Community",
-        key: "menu.askCommunity",
-        link: "/ask-the-community",
-        icon: "mdi-help-circle-outline",
-    },
+  {
+    title: "Profile Details",
+    key: "menu.profileDetails",
+    link: "/profile",
+    icon: "mdi-account-box-outline",
+  },
+  {
+    title: "Plans and Billing",
+    key: "menu.plansAndBilling",
+    link: "/plans-and-billing",
+    icon: "mdi-credit-card-outline",
+  },
+  {
+    title: "Team",
+    key: "menu.team",
+    link: "/team",
+    icon: "mdi-account-group-outline",
+  },
+  {
+    title: "API Dashboard",
+    key: "menu.apiDashboard",
+    link: "/api-dashboard",
+    icon: "mdi-monitor-dashboard",
+  },
+  {
+    title: "Integrations",
+    key: "menu.integrations",
+    link: "/integrations",
+    icon: "mdi-puzzle-outline",
+  },
+  {
+    title: "Ask the Community",
+    key: "menu.askCommunity",
+    link: "/ask-the-community",
+    icon: "mdi-help-circle-outline",
+  },
 ];
 
 interface Color {
-    colorId: number;
-    colorName: string;
-    colorValue: string;
+  colorId: number;
+  colorName: string;
+  colorValue: string;
 }
 
 const customizeTheme = useCustomizeThemeStore();
 const theme = useTheme();
 const currentColor = ref<Color>({
-    colorId: 1,
-    colorName: "grey",
-    colorValue: "#344767",
+  colorId: 1,
+  colorName: "grey",
+  colorValue: "#344767",
 });
 watch(currentColor, (newVal) => {
-    if (customizeTheme.darkTheme) {
-        tips();
-    } else {
-        customizeTheme.setPrimaryColor(newVal);
-        theme.themes.value.light.colors.primary = newVal.colorValue;
-        // theme.themes.value.dark.colors.primary = newVal.colorValue;
-        setThemeColor(newVal.colorValue)
-    }
+  if (customizeTheme.darkTheme) {
+    tips();
+  } else {
+    customizeTheme.setPrimaryColor(newVal);
+    theme.themes.value.light.colors.primary = newVal.colorValue;
+    // theme.themes.value.dark.colors.primary = newVal.colorValue;
+    setThemeColor(newVal.colorValue)
+  }
 });
 
 function tips() {
-    ElMessage({
-        // @ts-ignore   在类型实例化时此处可能导致造成内存溢出或无限递归
-        message: i18n.global.t("toolbar.toolbarUser.tips"),
-        grouping: true,
-        type: 'error',
-    })
+  ElMessage({
+    // @ts-ignore   在类型实例化时此处可能导致造成内存溢出或无限递归
+    message: i18n.global.t("toolbar.toolbarUser.tips"),
+    grouping: true,
+    type: 'error',
+  })
 }
 </script>
 
@@ -165,8 +181,8 @@ function tips() {
     <template v-slot:activator="{ props }">
       <v-btn class="mx-2" icon v-bind="props">
         <v-badge bordered color="success" content="2" dot>
-          <v-avatar size="40">
-            <v-img :src="headImage as string"></v-img>
+          <v-avatar size="50">
+            <el-image :src=userAvatar />
           </v-avatar>
         </v-badge>
       </v-btn>
@@ -180,7 +196,7 @@ function tips() {
         <v-list-item to="/profile">
           <template v-slot:prepend>
             <v-avatar size="50">
-              <v-img :src="headImage as string"></v-img>
+              <el-image :src="userAvatar"></el-image>
             </v-avatar>
           </template>
           <v-list-item-title class="font-weight-bold text-primary">
@@ -270,9 +286,9 @@ function tips() {
             </div>
             <v-item-group
               v-model="currentColor"
+              :prop="customizeTheme.darkTheme"
               class="mt-3"
               mandatory
-              :prop="customizeTheme.darkTheme"
               selected-class="elevation-12"
             >
               <div style="margin-top: 5px;margin-bottom: 6px">

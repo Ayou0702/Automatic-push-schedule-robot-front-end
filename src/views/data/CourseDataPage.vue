@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import {onBeforeMount, Ref, ref} from 'vue'
-import axios from "axios";
-import {v4 as uuidv4} from "uuid";
+import axios, {AxiosResponse} from "axios";
 import {useCustomizeThemeStore} from "@/stores/customizeTheme";
 import CopyLabel from "@/components/common/CopyLabel.vue";
 import {useTheme} from "vuetify";
@@ -12,6 +11,7 @@ let editing = ref(false)
 let courseData: Ref<Array<any>> = ref([])
 let addCourseData: Ref<Array<any>> = ref([])
 let deleteCourseData: Ref<Array<any>> = ref([])
+let courseAvatarList: Ref<Array<any>> = ref([])
 
 // 主题
 const customizeTheme = useCustomizeThemeStore();
@@ -23,29 +23,42 @@ const diffCourse: Ref<Array<any>> = ref([]);
 
 // 通过Vue的生命周期函数获取数据库中的课程数据，并写入一份到本地缓存，用以比较课程信息差异
 onBeforeMount(() => {
-  getCourseData()
+  getCourseData().then(response => {
+    if (response.data.code === 200) {
+      elMessage(response.data.message, "success")
+    }
+  })
 })
 
-function getCourseData() {
-  axios.get('http://localhost:8089/getCourseData')
-       .then(response => {
-         if (response.data.code === 200) {
+function getCourseData(): Promise<AxiosResponse<any>>  {
+  return axios.get('http://localhost:8089/getCourseData')
+              .then(response => {
 
-           elMessage(response.data.message, "success")
+                if (response.data.code !== 200) {
+                  elMessage(response.data.message, "error");
+                  return Promise.reject({response: {data: {code: -1, message: response.data.message}}});
+                }
 
-           courseData.value = response.data.data;
-           localStorage.setItem("courseData", JSON.stringify(courseData.value))
+                response.data.data.map(data => data.courseAvatar = 'data:image/jpeg;base64,' + data.courseAvatar)
 
-         } else {
+                courseData.value = response.data.data;
+                localStorage.setItem("courseData", JSON.stringify(courseData.value, (key, value) => {
+                  if (key === 'courseAvatar') {
+                    return undefined;
+                  }
+                  return value;
+                }));
 
-           elMessage(response.data.message, "error")
+                courseAvatarList.value = response.data.data.map(item => item.courseAvatar);
 
-         }
+                return response;
 
-       })
-       .catch(error => {
-         elMessage(error.message, "error")
-       })
+              })
+              .catch(error => {
+                elMessage(error.message, "error");
+                // 失败情况下返回约定错误格式（例如 code 字段为 -1
+                return Promise.reject({response: {data: {code: -1, message: error.message}}});
+              });
 }
 
 function noDiff() {
@@ -103,6 +116,7 @@ interface CourseData {
   courseSpecialized: boolean,
   courseId: number,
   courseName: string,
+  courseAvatar: Uint8Array,
   courseVenue: string,
 }
 
@@ -114,10 +128,14 @@ function editState() {
 // 监视被修改的课程信息并将其提取至diffCourse中
 function diffSearch() {
   const localCourseDataStr = localStorage.getItem('courseData')?.trim() ?? '[]';
-  const localCourseData = JSON.parse(localCourseDataStr);
+  let localCourseData = JSON.parse(localCourseDataStr);
 
   // 如果本地的缓存课程数据与内存中的不一致，则直接将内存中的课程数据赋值给diffCourse
   // 但是这种情况基本不会出现
+
+  localCourseData = localCourseData.filter(item => !deleteCourseData.value.includes(item.courseId))
+
+
   if (localCourseData.length !== courseData.value.length) {
     diffCourse.value = courseData.value;
     return;
@@ -161,6 +179,10 @@ function confirmModification() {
   deleteCourseData.value = deleteCourseData.value.filter(data => typeof data !== 'string');
   addCourseData.value.forEach(courseData => {
     courseData.courseId = null;
+    courseData.courseAvatar = null;
+  })
+  diffCourse.value.forEach(courseData => {
+    courseData.courseAvatar = null;
   })
   axios.post('http://localhost:8089/modifyCourseData', {
     deleteCourseData: deleteCourseData.value,
@@ -178,8 +200,7 @@ function confirmModification() {
            courseData.value = [...courseData.value, ...addCourseData.value];
            addCourseData.value = [];
 
-           // 将变更回写至本地缓存
-           localStorage.setItem("courseData", JSON.stringify(courseData.value))
+           getCourseData();
 
          } else if(response.data.code === 901) {
 
@@ -221,9 +242,9 @@ function revocation() {
 function addCourse() {
   addCourseData.value.push({
     courseSpecialized: false,
-    courseId: uuidv4(),
     courseName: '',
     courseVenue: '',
+    courseAvatar: 'new',
   })
 }
 
@@ -247,6 +268,50 @@ function handleSelectionChange(val: CourseData[]) {
   multipleSelection.value = val;
 }
 
+interface Response {
+  code: number;
+  message: string;
+  data: any;
+}
+
+function modifyCourseAvatarSuccess(response: Response) {
+  if (response.code === 200) {
+    elMessage(response.message, "success")
+
+    queryCourseAvatarByTeacherId(response.data)
+
+  } else {
+    elMessage(response.message, "error")
+  }
+}
+
+function queryCourseAvatarByTeacherId(courseId: number) {
+  axios.post('http://localhost:8089/queryCourseAvatarByCourseId', {courseId})
+       .then(response => {
+         if (response.data.code === 200) {
+           courseData.value.filter(item => item.courseId == courseId).map(item => {
+             item.courseAvatar = 'data:image/jpeg;base64,' + response.data.data.courseAvatar;
+           })
+         } else {
+           elMessage(response.data.message, "error")
+         }
+       })
+}
+
+function deleteCourseAvatar(courseId: number) {
+  axios.post('http://localhost:8089/deleteCourseAvatar', {courseId})
+       .then(response => {
+         if (response.data.code === 200) {
+           elMessage(response.data.message, "success")
+           courseData.value.filter(item => item.courseId == courseId).map(item => {
+             item.courseAvatar = "null";
+           })
+         } else {
+           elMessage(response.data.message, "error")
+         }
+       })
+
+}
 </script>
 
 <template>
@@ -278,9 +343,10 @@ function handleSelectionChange(val: CourseData[]) {
         @selection-change="handleSelectionChange"
       >
         <el-table-column v-if="editing" type="selection" width="55"/>
-        <el-table-column :label="($t('menu.data.courseData.courseId'))" prop="courseId" width="200px">
+        <el-table-column :label="($t('menu.data.courseData.courseId'))" prop="courseId" width="150px">
           <template v-slot="{ row }">
-            <CopyLabel :text="'#'+row.courseId"/>
+            <span v-if="row.courseAvatar === 'new'"> 新增的课程</span>
+            <CopyLabel v-else :text="'#'+row.courseId"/>
           </template>
         </el-table-column>
         <el-table-column :label="($t('menu.data.courseData.courseName'))" prop="courseName">
@@ -295,6 +361,50 @@ function handleSelectionChange(val: CourseData[]) {
             <el-input v-if="editing" v-model="row.courseVenue" :style="inputStyle"/>
           </template>
         </el-table-column>
+        <el-table-column :label="($t('menu.data.courseData.courseAvatar'))" prop="courseAvatar">
+          <template v-slot="{ row }">
+            <div style="display: flex;justify-content: center;align-items: center">
+
+              <el-image :preview-src-list=courseAvatarList :src="row.courseAvatar"
+                        preview-teleported style="width: 60px;height: 60px;border-radius: 50%">
+                <template #error>
+                  <el-avatar style="width: 60px;height: 60px;font-size: 20px"> {{
+                      row.courseName.charAt(3)
+                    }}
+                  </el-avatar>
+                </template>
+              </el-image>
+              <div
+                v-if="row.courseAvatar != 'new'"
+                style="display: flex;flex-direction: column;justify-content: center;align-items: center;gap: 5px;margin-left: 10px">
+                <el-upload
+                  v-if="editing"
+                  :data="{'courseId':row.courseId}"
+                  :on-success="modifyCourseAvatarSuccess"
+                  action="http://localhost:8089/modifyCourseAvatar">
+                  <v-chip
+                    class="font-weight-bold"
+                    color="blue"
+                    size="small"
+                  >
+                    <v-icon icon="mdi-pencil" start></v-icon>
+                    修改
+                  </v-chip>
+                </el-upload>
+                <v-chip
+                  v-if="editing"
+                  class="font-weight-bold"
+                  color="red"
+                  size="small"
+                  @click="deleteCourseAvatar(row.courseId)"
+                >
+                  <v-icon icon="mdi-close" start></v-icon>
+                  删除
+                </v-chip>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column
           :filter-method="filterTag"
           :filters="[
@@ -304,7 +414,7 @@ function handleSelectionChange(val: CourseData[]) {
           :label="($t('menu.data.courseData.courseSpecialized'))"
           filter-placement="bottom-end"
           prop="courseSpecialized"
-          width="300px"
+          width="150px"
         >
           <template v-slot="{ row }">
 
@@ -407,4 +517,11 @@ function handleSelectionChange(val: CourseData[]) {
 }
 
 
+:deep(.el-upload-list) {
+    margin-top: 0;
+}
+
+:deep(.el-upload-list) {
+    display: none;
+}
 </style>

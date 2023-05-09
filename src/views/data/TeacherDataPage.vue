@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import {onBeforeMount, Ref, ref} from 'vue'
-import axios from "axios";
-import {v4 as uuidv4} from "uuid";
+import axios, {AxiosResponse} from "axios";
 import {useCustomizeThemeStore} from "@/stores/customizeTheme";
 import CopyLabel from "@/components/common/CopyLabel.vue";
 import {useTheme} from "vuetify";
@@ -22,35 +21,47 @@ const search = ref('')
 const multipleSelection = ref<TeacherData[]>([]);
 const diffTeacher: Ref<Array<any>> = ref([]);
 
+
 // 通过Vue的生命周期函数获取数据库中的教师数据，并写入一份到本地缓存，用以比较教师信息差异
 onBeforeMount(() => {
-  getTeacherData()
+  getTeacherData().then(response => {
+    if (response.data.code === 200) {
+      elMessage(response.data.message, "success")
+    }
+  })
+
 })
 
-function getTeacherData() {
-  axios.get('http://localhost:8089/getTeacherData')
-       .then(response => {
-         if (response.data.code === 200) {
 
-           elMessage(response.data.message, "success")
+function getTeacherData(): Promise<AxiosResponse<any>> {
+  return axios.get('http://localhost:8089/getTeacherData')
+              .then(response => {
 
-           response.data.data.map(data => data.teacherAvatar = 'data:image/jpeg;base64,' + data.teacherAvatar)
+                if (response.data.code !== 200) {
+                  elMessage(response.data.message, "error");
+                  return Promise.reject({ response: { data: { code: -1, message: response.data.message } } });
+                }
 
-           teacherData.value = response.data.data;
-           localStorage.setItem("teacherData", JSON.stringify(teacherData.value))
+                response.data.data.map(data => data.teacherAvatar = 'data:image/jpeg;base64,' + data.teacherAvatar)
 
-           teacherAvatarList.value = response.data.data.map(item => item.teacherAvatar);
+                teacherData.value = response.data.data;
+                localStorage.setItem("teacherData", JSON.stringify(teacherData.value, (key, value) => {
+                  if (key === 'teacherAvatar') {
+                    return undefined;
+                  }
+                  return value;
+                }));
 
-         } else {
+                teacherAvatarList.value = response.data.data.map(item => item.teacherAvatar);
 
-           elMessage(response.data.message, "error")
+                return response;
 
-         }
-
-       })
-       .catch(error => {
-         elMessage(error.message, "error")
-       })
+              })
+              .catch(error => {
+                elMessage(error.message, "error")
+                // 失败情况下返回约定错误格式（例如 code 字段为 -1）
+                return Promise.reject({ response: { data: { code: -1, message: error.message } } });
+              });
 }
 
 function noDiff() {
@@ -118,13 +129,18 @@ function editState() {
   editing.value = !editing.value
 }
 
-// 监视被修改的课程信息并将其提取至diffTeacher中
+// 监视被修改的教师信息并将其提取至diffTeacher中
 function diffSearch() {
+
+  console.log(diffTeacher.value)
   const localTeacherDataStr = localStorage.getItem('teacherData')?.trim() ?? '[]';
-  const localTeacherData = JSON.parse(localTeacherDataStr);
+  let localTeacherData = JSON.parse(localTeacherDataStr);
 
   // 如果本地的缓存教师数据与内存中的不一致，则直接将内存中的教师数据赋值给diffTeacher
   // 但是这种情况基本不会出现
+
+  localTeacherData = localTeacherData.filter(item => !deleteTeacherData.value.includes(item.teacherId))
+
   if (localTeacherData.length !== teacherData.value.length) {
     diffTeacher.value = teacherData.value;
     return;
@@ -154,6 +170,7 @@ function diffSearch() {
     if (hasChanged) {
       diffTeacher.value.push(curData);
     }
+
   }
 }
 
@@ -168,6 +185,10 @@ function confirmModification() {
   deleteTeacherData.value = deleteTeacherData.value.filter(data => typeof data !== 'string');
   addTeacherData.value.forEach(teacherData => {
     teacherData.teacherId = null;
+    teacherData.teacherAvatar = null;
+  })
+  diffTeacher.value.forEach(teacherData => {
+    teacherData.teacherAvatar = null;
   })
   axios.post('http://localhost:8089/modifyTeacherData', {
     deleteTeacherData: deleteTeacherData.value,
@@ -185,8 +206,7 @@ function confirmModification() {
            teacherData.value = [...teacherData.value, ...addTeacherData.value];
            addTeacherData.value = [];
 
-           // 将变更回写至本地缓存
-           localStorage.setItem("teacherData", JSON.stringify(teacherData.value))
+           getTeacherData();
 
          } else if (response.data.code === 901) {
 
@@ -228,9 +248,9 @@ function revocation() {
 function addTeacher() {
   addTeacherData.value.push({
     teacherSpecialized: false,
-    teacherId: uuidv4(),
     teacherName: '',
     teacherVenue: '',
+    teacherAvatar: 'new',
   })
 }
 
@@ -257,17 +277,31 @@ function handleSelectionChange(val: TeacherData[]) {
 interface Response {
   code: number;
   message: string;
-  data: object;
+  data: any;
 }
 
-function modifyTeacherAvatarSuccess(response: Response, file: File) {
+function modifyTeacherAvatarSuccess(response: Response) {
   if (response.code === 200) {
     elMessage(response.message, "success")
 
-    console.log(file)
+    queryTeacherAvatarByTeacherId(response.data)
+
   } else {
     elMessage(response.message, "error")
   }
+}
+
+function queryTeacherAvatarByTeacherId(teacherId: number) {
+  axios.post('http://localhost:8089/queryTeacherAvatarByTeacherId', {teacherId})
+       .then(response => {
+         if (response.data.code === 200) {
+           teacherData.value.filter(item => item.teacherId == teacherId).map(item => {
+             item.teacherAvatar = 'data:image/jpeg;base64,' + response.data.data.teacherAvatar;
+           })
+         } else {
+           elMessage(response.data.message, "error")
+         }
+       })
 }
 
 function deleteTeacherAvatar(teacherId: number) {
@@ -309,14 +343,14 @@ function deleteTeacherAvatar(teacherId: number) {
       <!--通过:style动态绑定表格样式-->
       <el-table
         :data="filterTeacherData"
-        :default-sort="{ prop: 'teacherId', order: 'desc' }"
         :style="tableStyle"
         @selection-change="handleSelectionChange"
       >
         <el-table-column v-if="editing" type="selection" width="55"/>
         <el-table-column :label="($t('menu.data.teacherData.teacherId'))" prop="teacherId" width="100px">
           <template v-slot="{ row }">
-            <CopyLabel :text="'#'+row.teacherId"/>
+            <span v-if="row.teacherAvatar === 'new'"> 新增的教师</span>
+            <CopyLabel v-else :text="'#'+row.teacherId"/>
           </template>
         </el-table-column>
         <el-table-column :label="($t('menu.data.teacherData.teacherName'))" prop="teacherName">
@@ -351,13 +385,14 @@ function deleteTeacherAvatar(teacherId: number) {
                 </template>
               </el-image>
               <div
+                v-if="row.teacherAvatar != 'new'"
                 style="display: flex;flex-direction: column;justify-content: center;align-items: center;gap: 5px;margin-left: 10px">
                 <el-upload
+                  v-if="editing"
                   :data="{'teacherId':row.teacherId}"
                   :on-success="modifyTeacherAvatarSuccess"
                   action="http://localhost:8089/modifyTeacherAvatar">
                   <v-chip
-                    v-if="editing"
                     class="font-weight-bold"
                     color="blue"
                     size="small"

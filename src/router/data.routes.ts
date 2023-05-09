@@ -2,6 +2,16 @@
 
 export default [
   {
+    path: "/data/schedule-data",
+    component: () => import("@/views/data/ScheduleDataPage.vue"),
+    meta: {
+      requiresAuth: true,
+      layout: "ui",
+      category: "Data",
+      title: "课表数据",
+    },
+  },
+  {
     path: "/data/course-data",
     component: () => import("@/views/data/CourseDataPage.vue"),
     meta: {

@@ -15,12 +15,35 @@ export default {
   menu: {
     dashboard: "仪表板",
     data: {
+      curriculumData: {
+        curriculumData: "课程推送队列",
+        search: "搜索课程名称",
+        curriculumId: "序列ID",
+        courseName: "课程名称",
+        teacherName: "教师名称",
+        curriculumPeriod:"课程周期",
+        curriculumWeek:"课程星期",
+        curriculumSection:"课程节次",
+        curriculumSpecialized: "专业",
+        edit:"编辑",
+      },
+      scheduleData: {
+        scheduleData: "课表数据",
+        search: "搜索课表名称",
+        scheduleId: "课表ID",
+        courseName: "课程名称",
+        teacherName: "教师名称",
+        schedulePeriod:"课程周期",
+        scheduleWeek:"课程星期",
+        scheduleSection:"课程节次"
+      },
       courseData: {
         courseData: "课程数据",
         search: "搜索课程名称",
         courseName: "课程名称",
         courseVenue: "上课地点",
         courseId: "课程ID",
+        courseAvatar: "课程头像",
         courseSpecialized: "专业",
       },
       teacherData: {
